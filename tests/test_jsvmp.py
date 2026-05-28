@@ -262,6 +262,14 @@ async def test_pre_inject_jsvmp_probe_registers():
     assert "__mcp_jsvmp_installed" in registered["pre_inject:jsvmp_probe"]
 
 
+def test_driver_disconnect_detection():
+    from camoufox_reverse_mcp.tools.navigation import _looks_like_driver_disconnect
+
+    assert _looks_like_driver_disconnect(Exception("Page.goto: Connection closed while reading from the driver"))
+    assert _looks_like_driver_disconnect(Exception("Target page, context or browser has been closed"))
+    assert not _looks_like_driver_disconnect(Exception("Timeout 30000ms exceeded"))
+
+
 # ============ Version ============
 
 def test_version_is_040():

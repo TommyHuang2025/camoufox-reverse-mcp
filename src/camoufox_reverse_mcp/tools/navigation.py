@@ -10,6 +10,15 @@ from ..server import mcp, browser_manager
 _PRE_INJECT_REGISTER_TIMEOUT = 10.0
 
 
+def _looks_like_driver_disconnect(error: Exception) -> bool:
+    text = str(error).lower()
+    return (
+        "connection closed while reading from the driver" in text
+        or "target page, context or browser has been closed" in text
+        or "browser has been closed" in text
+    )
+
+
 @mcp.tool()
 async def launch_browser(
     headless: bool = False,
@@ -70,6 +79,13 @@ async def launch_browser(
 
         return result
     except Exception as e:
+        if _looks_like_driver_disconnect(e):
+            await browser_manager.close()
+            return {
+                "error": str(e),
+                "browser_recovered": True,
+                "hint": "browser driver disconnected; MCP browser state was cleared, call launch_browser() again",
+            }
         return {"error": str(e)}
 
 
@@ -79,6 +95,13 @@ async def close_browser() -> dict:
     try:
         return await browser_manager.close()
     except Exception as e:
+        if _looks_like_driver_disconnect(e):
+            await browser_manager.close()
+            return {
+                "error": str(e),
+                "browser_recovered": True,
+                "hint": "browser driver disconnected; MCP browser state was cleared, call launch_browser() again",
+            }
         return {"error": str(e)}
 
 
@@ -182,6 +205,13 @@ async def navigate(
             "warnings": warnings if warnings else None,
         }
     except Exception as e:
+        if _looks_like_driver_disconnect(e):
+            await browser_manager.close()
+            return {
+                "error": str(e),
+                "browser_recovered": True,
+                "hint": "browser driver disconnected; MCP browser state was cleared, call launch_browser() again",
+            }
         return {"error": str(e)}
 
 

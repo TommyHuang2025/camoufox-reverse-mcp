@@ -44,7 +44,7 @@ async def check_environment() -> dict:
     # Browser state
     browser_state: dict[str, Any] = {"running": False}
     try:
-        if browser_manager.browser is not None:
+        if browser_manager.browser is not None and browser_manager.is_connected():
             browser_state["running"] = True
             ctx = browser_manager.contexts.get("default")
             pages = ctx.pages if ctx else []
@@ -59,6 +59,10 @@ async def check_environment() -> dict:
             browser_state["has_residuals"] = has_residuals
             if has_residuals:
                 recommendations.append("Browser has residual state. Consider reset_browser_state().")
+        elif browser_manager.browser is not None:
+            browser_state["running"] = False
+            browser_state["disconnected_stale_state"] = True
+            recommendations.append("Browser driver is disconnected. Call close_browser() or launch_browser() to clear stale state.")
     except Exception as e:
         browser_state["error"] = str(e)
 

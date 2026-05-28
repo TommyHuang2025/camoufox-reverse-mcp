@@ -46,3 +46,19 @@ def test_init_scripts_list():
     mgr = BrowserManager()
     assert isinstance(mgr._init_scripts, list)
     assert len(mgr._init_scripts) == 0
+
+
+def test_is_connected_without_browser():
+    mgr = BrowserManager()
+    assert mgr.is_connected() is False
+
+
+def test_is_connected_uses_browser_status():
+    class ClosedBrowser:
+        def is_connected(self):
+            return False
+
+    mgr = BrowserManager()
+    mgr.browser = ClosedBrowser()
+
+    assert mgr.is_connected() is False
