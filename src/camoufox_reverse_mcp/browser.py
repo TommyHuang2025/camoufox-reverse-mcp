@@ -58,19 +58,22 @@ class BrowserManager:
     async def launch(self, config: dict | None = None) -> dict:
         """Launch the Camoufox browser with the given or default config."""
         if self.browser is not None:
-            pages_info = {}
-            for name, p in self.pages.items():
-                try:
-                    pages_info[name] = p.url
-                except Exception:
-                    pages_info[name] = "unknown"
-            return {
-                "status": "already_running",
-                "active_page": self.active_page_name,
-                "pages": pages_info,
-                "contexts": list(self.contexts.keys()),
-                "capturing": self._capturing,
-            }
+            if not self.is_connected():
+                await self.close()
+            else:
+                pages_info = {}
+                for name, p in self.pages.items():
+                    try:
+                        pages_info[name] = p.url
+                    except Exception:
+                        pages_info[name] = "unknown"
+                return {
+                    "status": "already_running",
+                    "active_page": self.active_page_name,
+                    "pages": pages_info,
+                    "contexts": list(self.contexts.keys()),
+                    "capturing": self._capturing,
+                }
 
         from camoufox.async_api import AsyncCamoufox
 
@@ -174,6 +177,19 @@ class BrowserManager:
             "locale": locale,
             "pages": list(self.pages.keys()),
         }
+
+    def is_connected(self) -> bool:
+        """Return whether the underlying Playwright browser connection is alive."""
+        if self.browser is None:
+            return False
+        try:
+            is_connected = getattr(self.browser, "is_connected", None)
+            if callable(is_connected):
+                return bool(is_connected())
+            _ = self.browser.contexts
+            return True
+        except Exception:
+            return False
 
     async def _ensure_browser(self) -> None:
         """Lazy-launch the browser if not already running."""
@@ -311,6 +327,9 @@ class BrowserManager:
     async def get_active_page(self) -> Page:
         """Get the currently active page, launching the browser if needed."""
         await self._ensure_browser()
+        if not self.is_connected():
+            await self.close()
+            await self.launch()
         if self.active_page_name and self.active_page_name in self.pages:
             return self.pages[self.active_page_name]
         raise RuntimeError("No active page available. Call launch_browser first.")
