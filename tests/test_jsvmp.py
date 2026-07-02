@@ -216,6 +216,11 @@ async def test_launch_browser_passes_virtual_display():
         result = await navigation.launch_browser(
             headless=False,
             locale="en-US",
+            proxy="socks5://proxy.example.com:1080",
+            proxy_username="user",
+            proxy_password="pass",
+            proxy_bypass=".internal,localhost",
+            geoip="203.0.113.10",
             virtual_display=":99",
             executable_path="/tmp/camoufox-reverse/camoufox-bin",
         )
@@ -223,6 +228,13 @@ async def test_launch_browser_passes_virtual_display():
     assert result["status"] == "launched"
     assert captured["headless"] is False
     assert captured["locale"] == "en-US"
+    assert captured["proxy"] == {
+        "server": "socks5://proxy.example.com:1080",
+        "username": "user",
+        "password": "pass",
+        "bypass": ".internal,localhost",
+    }
+    assert captured["geoip"] == "203.0.113.10"
     assert captured["virtual_display"] == ":99"
     assert captured["executable_path"] == "/tmp/camoufox-reverse/camoufox-bin"
 

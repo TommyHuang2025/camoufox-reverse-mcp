@@ -102,7 +102,14 @@ async def test_check_environment_reports_configured_runtime(tmp_path):
 
     old_config = dict(environment.browser_manager.default_config)
     try:
-        environment.browser_manager.default_config = {"executable_path": str(exe)}
+        environment.browser_manager.default_config = {
+            "executable_path": str(exe),
+            "proxy": {
+                "server": "socks5://proxy.example.com:1080",
+                "username": "proxy-user",
+                "password": "proxy-pass",
+            },
+        }
         result = await environment.check_environment()
     finally:
         environment.browser_manager.default_config = old_config
@@ -111,3 +118,10 @@ async def test_check_environment_reports_configured_runtime(tmp_path):
     assert runtime["configured_executable"] == str(exe)
     assert runtime["configured_executable_exists"] is True
     assert runtime["installed"] is True
+
+    proxy = result["proxy"]
+    assert proxy["configured"] is True
+    assert proxy["server"] == "socks5://proxy.example.com:1080"
+    assert proxy["username"] == "pr***er"
+    assert proxy["password_configured"] is True
+    assert "proxy-pass" not in str(result)
