@@ -14,15 +14,13 @@ from ..property_trace import (
     CONTROL_DIR, TRACES_DIR,
     list_session_files, load_events,
     build_summary, build_timeline, build_sequence,
-    filter_events, write_control_all, cleanup_traces,
+    filter_events, write_control_all, cleanup_traces, list_control_files,
 )
 
 
 def _is_trace_enabled() -> bool:
     """Check if any control files exist (= custom browser with trace enabled)."""
-    if not CONTROL_DIR.exists():
-        return False
-    return len(list(CONTROL_DIR.glob("control-*.cmd"))) > 0
+    return bool(list_control_files(live_only=True, cleanup_stale=True))
 
 
 @mcp.tool()

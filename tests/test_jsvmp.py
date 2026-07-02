@@ -200,6 +200,33 @@ def test_new_tools_registered():
     assert not missing, f"Missing tools: {missing}"
 
 
+@pytest.mark.asyncio
+async def test_launch_browser_passes_virtual_display():
+    """launch_browser should pass runtime overrides to BrowserManager."""
+    from unittest.mock import patch
+    from camoufox_reverse_mcp.tools import navigation
+
+    captured = {}
+
+    async def _mock_launch(config):
+        captured.update(config)
+        return {"status": "launched"}
+
+    with patch.object(navigation.browser_manager, "launch", _mock_launch):
+        result = await navigation.launch_browser(
+            headless=False,
+            locale="en-US",
+            virtual_display=":99",
+            executable_path="/tmp/camoufox-reverse/camoufox-bin",
+        )
+
+    assert result["status"] == "launched"
+    assert captured["headless"] is False
+    assert captured["locale"] == "en-US"
+    assert captured["virtual_display"] == ":99"
+    assert captured["executable_path"] == "/tmp/camoufox-reverse/camoufox-bin"
+
+
 # ============ pre_inject registration ============
 
 @pytest.mark.asyncio
@@ -272,6 +299,6 @@ def test_driver_disconnect_detection():
 
 # ============ Version ============
 
-def test_version_is_040():
+def test_version_is_current():
     from camoufox_reverse_mcp import __version__
-    assert __version__ == "1.0.1"
+    assert __version__ == "1.1.0"

@@ -101,6 +101,65 @@ pip install -e .
 
 </details>
 
+<details>
+<summary><b>Claude Code（使用已有 Xvfb 显示）</b></summary>
+
+服务器已有 `Xvfb :99` 时，可让 MCP 默认使用可见浏览器模式：
+
+```json
+{
+  "mcpServers": {
+    "camoufox-reverse": {
+      "command": "python",
+      "args": [
+        "-m", "camoufox_reverse_mcp",
+        "--virtual-display", ":99"
+      ]
+    }
+  }
+}
+```
+
+也可以在单次工具调用中传入 `launch_browser(headless=false, virtual_display=":99")`。如果不提供 `DISPLAY` 或 `virtual_display`，Linux 服务器上的 `headless=false` 会因没有 X display 启动失败。
+
+</details>
+
+### Locale 自动检测
+
+`launch_browser(locale="auto")` 会从 `LC_ALL`、`LC_MESSAGES`、`LANG` 读取系统 locale，并转换成 Camoufox 可接受的格式（例如 `zh_CN.UTF-8` → `zh-CN`）。如果服务器只配置了 POSIX/C locale（例如 `C`、`C.UTF-8`、`POSIX`），会自动回退到 `en-US`，避免 Camoufox 因 `Invalid locale: 'C'` 启动失败。
+
+需要固定浏览器语言时，仍建议显式传入 `launch_browser(locale="zh-CN")` 或在 MCP 启动参数中使用 `--locale zh-CN`。
+
+### 项目内 camoufox-reverse runtime
+
+如果不想替换全局 `~/.cache/camoufox`，可以把定制 runtime 解压到项目目录，并通过 `--executable-path` 指定二进制：
+
+```json
+{
+  "mcpServers": {
+    "camoufox-reverse": {
+      "command": "python",
+      "args": [
+        "-m", "camoufox_reverse_mcp",
+        "--executable-path",
+        "artifacts/camoufox-reverse/runtime/v135.0.1-beta.25/camoufox-bin"
+      ]
+    }
+  }
+}
+```
+
+也可以单次调用：
+
+```text
+launch_browser(
+  enable_trace=true,
+  executable_path="artifacts/camoufox-reverse/runtime/v135.0.1-beta.25/camoufox-bin"
+)
+```
+
+`enable_trace=true` 会注入 PropertyTracer 配置并在 `~/.cache/camoufox-reverse/` 下生成 control/trace 文件；随后可使用 `trace_property_access`、`list_trace_files` 和 `query_trace_file`。
+
 ---
 
 ## 可用工具一览（35 个）
@@ -117,6 +176,8 @@ pip install -e .
 | `click` / `type_text` | 点击元素 / 输入文本 |
 | `wait_for` | 等待元素出现或 URL 匹配 |
 | `get_page_info` | 获取当前页面 URL、标题、视口尺寸 |
+
+`launch_browser` 的 `virtual_display` 参数用于 Linux 服务器可见浏览器模式，例如 `virtual_display=":99"`。它会传给 Camoufox 的 `virtual_display` 选项，不需要 MCP 进程外部设置 `DISPLAY`。`executable_path` 参数用于指定项目内或自定义 Camoufox 二进制。
 
 ### JS 执行与调试
 | 工具 | 说明 |

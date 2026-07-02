@@ -69,16 +69,24 @@ async def check_environment() -> dict:
     overall_ok = version_ok and all(d["ok"] for d in deps.values() if d.get("installed"))
 
     # camoufox-reverse custom browser detection
-    from ..property_trace import CACHE_DIR, CONTROL_DIR, TRACES_DIR
+    from ..property_trace import CACHE_DIR, TRACES_DIR, list_control_files
     custom_browser: dict[str, Any] = {"installed": False}
     try:
+        configured_executable = browser_manager.default_config.get("executable_path")
+        configured_executable_exists = False
+        if configured_executable:
+            from pathlib import Path
+            configured_executable_exists = Path(configured_executable).expanduser().exists()
+
         # Check if trace control files exist (= custom browser running with trace)
-        ctrl_files = list(CONTROL_DIR.glob("control-*.cmd")) if CONTROL_DIR.exists() else []
+        ctrl_files = list_control_files(live_only=True, cleanup_stale=True)
         trace_files = list(TRACES_DIR.glob("*.jsonl")) if TRACES_DIR.exists() else []
-        if ctrl_files:
+        if configured_executable_exists or ctrl_files:
             custom_browser = {
-                "installed": True,
-                "trace_active": True,
+                "installed": configured_executable_exists or bool(ctrl_files),
+                "configured_executable": configured_executable,
+                "configured_executable_exists": configured_executable_exists,
+                "trace_active": bool(ctrl_files),
                 "control_files": len(ctrl_files),
                 "trace_files": len(trace_files),
                 "cache_dir": str(CACHE_DIR),
@@ -86,6 +94,8 @@ async def check_environment() -> dict:
         else:
             custom_browser = {
                 "installed": False,
+                "configured_executable": configured_executable,
+                "configured_executable_exists": configured_executable_exists,
                 "install_hint": (
                     "Download camoufox-reverse from "
                     "https://github.com/WhiteNightShadow/camoufox-reverse/releases "

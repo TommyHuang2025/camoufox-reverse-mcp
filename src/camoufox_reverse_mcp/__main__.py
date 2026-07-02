@@ -30,6 +30,10 @@ def main():
     parser.add_argument("--humanize", action="store_true", help="Enable humanized mouse movement")
     parser.add_argument("--block-images", action="store_true", help="Block image loading")
     parser.add_argument("--block-webrtc", action="store_true", help="Block WebRTC")
+    parser.add_argument("--virtual-display", type=str,
+                        help="X display to use for headed browser mode, e.g. :99")
+    parser.add_argument("--executable-path", type=str,
+                        help="Custom Camoufox executable path")
     args = parser.parse_args()
 
     from .browser import BrowserManager
@@ -42,6 +46,8 @@ def main():
         "humanize": args.humanize,
         "block_images": args.block_images,
         "block_webrtc": args.block_webrtc,
+        "virtual_display": args.virtual_display,
+        "executable_path": args.executable_path,
     }
 
     mcp.run(transport="stdio")

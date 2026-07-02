@@ -1,5 +1,5 @@
 import pytest
-from camoufox_reverse_mcp.browser import BrowserManager
+from camoufox_reverse_mcp.browser import BrowserManager, detect_system_locale
 
 
 def test_browser_manager_init():
@@ -13,6 +13,22 @@ def test_browser_manager_init():
 
 def test_default_config():
     assert isinstance(BrowserManager.default_config, dict)
+
+
+def test_detect_system_locale_falls_back_for_c_utf8(monkeypatch):
+    monkeypatch.setenv("LC_ALL", "C.UTF-8")
+    monkeypatch.setenv("LC_MESSAGES", "C.utf8")
+    monkeypatch.setenv("LANG", "C")
+
+    assert detect_system_locale() == "en-US"
+
+
+def test_detect_system_locale_normalizes_region(monkeypatch):
+    monkeypatch.delenv("LC_ALL", raising=False)
+    monkeypatch.delenv("LC_MESSAGES", raising=False)
+    monkeypatch.setenv("LANG", "zh_CN.UTF-8")
+
+    assert detect_system_locale() == "zh-CN"
 
 
 def test_console_logs_maxlen():

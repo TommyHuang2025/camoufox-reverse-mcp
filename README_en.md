@@ -101,9 +101,68 @@ pip install -e .
 
 </details>
 
+<details>
+<summary><b>Claude Code (using an existing Xvfb display)</b></summary>
+
+When the server already has `Xvfb :99`, MCP can default to headed browser mode on that display:
+
+```json
+{
+  "mcpServers": {
+    "camoufox-reverse": {
+      "command": "python",
+      "args": [
+        "-m", "camoufox_reverse_mcp",
+        "--virtual-display", ":99"
+      ]
+    }
+  }
+}
+```
+
+You can also pass `launch_browser(headless=false, virtual_display=":99")` for a single tool call. Without `DISPLAY` or `virtual_display`, `headless=false` fails on Linux servers with no X display.
+
+</details>
+
+### Locale Auto-Detection
+
+`launch_browser(locale="auto")` reads the system locale from `LC_ALL`, `LC_MESSAGES`, and `LANG`, then converts it to a Camoufox-compatible value such as `zh_CN.UTF-8` → `zh-CN`. If the host only has a POSIX/C locale such as `C`, `C.UTF-8`, or `POSIX`, it falls back to `en-US` so Camoufox does not fail with `Invalid locale: 'C'`.
+
+When you need a fixed browser language, still prefer passing `launch_browser(locale="zh-CN")` explicitly or starting the MCP server with `--locale zh-CN`.
+
+### Project-Local camoufox-reverse Runtime
+
+If you do not want to replace the global `~/.cache/camoufox` browser, extract the custom runtime into the project and pass its binary through `--executable-path`:
+
+```json
+{
+  "mcpServers": {
+    "camoufox-reverse": {
+      "command": "python",
+      "args": [
+        "-m", "camoufox_reverse_mcp",
+        "--executable-path",
+        "artifacts/camoufox-reverse/runtime/v135.0.1-beta.25/camoufox-bin"
+      ]
+    }
+  }
+}
+```
+
+For one tool call:
+
+```text
+launch_browser(
+  enable_trace=true,
+  executable_path="artifacts/camoufox-reverse/runtime/v135.0.1-beta.25/camoufox-bin"
+)
+```
+
+`enable_trace=true` injects the PropertyTracer configuration and writes control/trace files under `~/.cache/camoufox-reverse/`. Then use `trace_property_access`, `list_trace_files`, and `query_trace_file`.
+
 ---
 
-## Available Tools (32)
+## Available Tools (35)
 
 ### Browser Control
 | Tool | Description |
@@ -117,6 +176,8 @@ pip install -e .
 | `click` / `type_text` | Click element / type text |
 | `wait_for` | Wait for element or URL pattern |
 | `get_page_info` | Get current page URL, title, viewport |
+
+`launch_browser` accepts `virtual_display` for Linux server headed mode, for example `virtual_display=":99"`. It is passed to Camoufox's `virtual_display` option, so the MCP process does not need an external `DISPLAY` environment variable. `executable_path` selects a project-local or custom Camoufox binary.
 
 ### JS Execution & Debugging
 | Tool | Description |
@@ -235,7 +296,7 @@ pip install -e .
 │           AI Coding Assistant (Cursor / Claude)  │
 │                    ↕ MCP (stdio)                 │
 ├─────────────────────────────────────────────────┤
-│           camoufox-reverse-mcp (32 tools)        │
+│           camoufox-reverse-mcp (35 tools)        │
 │  ┌──────────┬──────────┬──────────┬──────────┐  │
 │  │Navigation│ Script   │Debugging │ Hooking  │  │
 │  │          │ Analysis │          │          │  │

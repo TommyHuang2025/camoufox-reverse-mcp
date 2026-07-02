@@ -29,6 +29,8 @@ async def launch_browser(
     geoip: bool = False,
     block_images: bool = False,
     block_webrtc: bool = False,
+    virtual_display: str | None = None,
+    executable_path: str | None = None,
     enable_trace: bool = False,
 ) -> dict:
     """Launch the Camoufox anti-detection browser.
@@ -42,6 +44,8 @@ async def launch_browser(
         geoip: Auto-infer geolocation from proxy IP.
         block_images: Block image loading.
         block_webrtc: Block WebRTC to prevent IP leaks.
+        virtual_display: X display for headed browser mode, e.g. ":99".
+        executable_path: Custom Camoufox executable path.
         enable_trace: Enable engine-level property access tracing.
             Requires camoufox-reverse custom browser build.
             When enabled, use trace_property_access() to capture DOM access.
@@ -56,6 +60,10 @@ async def launch_browser(
             "block_images": block_images, "block_webrtc": block_webrtc,
             "enable_trace": enable_trace,
         }
+        if virtual_display:
+            config["virtual_display"] = virtual_display
+        if executable_path:
+            config["executable_path"] = executable_path
         if proxy:
             config["proxy"] = {"server": proxy}
         result = await browser_manager.launch(config)

@@ -23,12 +23,23 @@ def detect_host_os() -> str:
     return "windows"
 
 
+def _normalize_system_locale(value: str) -> str | None:
+    value = value.strip()
+    if not value:
+        return None
+
+    locale = value.split(".", 1)[0].split("@", 1)[0].replace("_", "-")
+    if locale.upper() in ("C", "POSIX"):
+        return None
+    return locale or None
+
+
 def detect_system_locale() -> str:
     """Best-effort detection of the host's locale (e.g. 'zh-CN')."""
-    for var in ("LANG", "LC_ALL", "LC_MESSAGES"):
-        val = _os.environ.get(var, "")
-        if val and val not in ("C", "POSIX"):
-            return val.split(".")[0].replace("_", "-")
+    for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        locale = _normalize_system_locale(_os.environ.get(var, ""))
+        if locale:
+            return locale
     return "en-US"
 
 
@@ -83,6 +94,8 @@ class BrowserManager:
 
         if cfg.get("proxy"):
             kwargs["proxy"] = cfg["proxy"]
+        if cfg.get("executable_path"):
+            kwargs["executable_path"] = cfg["executable_path"]
 
         os_type = cfg.get("os", "auto")
         host_os = detect_host_os()
@@ -106,6 +119,8 @@ class BrowserManager:
 
         headless = cfg.get("headless", False)
         kwargs["headless"] = headless
+        if cfg.get("virtual_display") and not headless:
+            kwargs["virtual_display"] = cfg["virtual_display"]
 
         # Property trace support
         enable_trace = cfg.get("enable_trace", False)
@@ -175,6 +190,8 @@ class BrowserManager:
             "headless": headless,
             "os": os_type,
             "locale": locale,
+            "virtual_display": cfg.get("virtual_display"),
+            "executable_path": cfg.get("executable_path"),
             "pages": list(self.pages.keys()),
         }
 

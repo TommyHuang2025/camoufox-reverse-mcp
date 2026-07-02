@@ -29,6 +29,43 @@ def control_path_for(pid: int) -> Path:
     return CONTROL_DIR / f"control-{pid}.cmd"
 
 
+def _pid_from_control_path(path: Path) -> int | None:
+    try:
+        return int(path.stem.split("-", 1)[1])
+    except (IndexError, ValueError):
+        return None
+
+
+def is_pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def list_control_files(live_only: bool = True, cleanup_stale: bool = True) -> list[Path]:
+    if not CONTROL_DIR.exists():
+        return []
+
+    files: list[Path] = []
+    for f in CONTROL_DIR.glob("control-*.cmd"):
+        pid = _pid_from_control_path(f)
+        alive = pid is not None and is_pid_alive(pid)
+        if alive or not live_only:
+            files.append(f)
+        elif cleanup_stale:
+            try:
+                f.unlink()
+            except Exception:
+                pass
+    return files
+
+
 def build_property_trace_config() -> dict:
     """Build the propertyTrace config block for CAMOU_CONFIG."""
     ensure_dirs()
@@ -51,7 +88,7 @@ def write_control(pid: int, cmd: str) -> bool:
 def write_control_all(cmd: str) -> int:
     """Write command to all control files. Returns count."""
     count = 0
-    for f in CONTROL_DIR.glob("control-*.cmd"):
+    for f in list_control_files(live_only=True, cleanup_stale=True):
         try:
             f.write_text(cmd)
             count += 1

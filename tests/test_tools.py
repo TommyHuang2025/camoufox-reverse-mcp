@@ -77,3 +77,37 @@ def test_hook_files_exist():
     ]
     for f in expected_files:
         assert os.path.exists(os.path.join(hooks_dir, f)), f"Missing hook file: {f}"
+
+
+def test_list_control_files_ignores_stale_pids(tmp_path, monkeypatch):
+    from camoufox_reverse_mcp import property_trace
+
+    monkeypatch.setattr(property_trace, "CONTROL_DIR", tmp_path)
+    stale = tmp_path / "control-999999999.cmd"
+    stale.write_text("on")
+
+    files = property_trace.list_control_files(live_only=True, cleanup_stale=True)
+
+    assert files == []
+    assert not stale.exists()
+
+
+@pytest.mark.asyncio
+async def test_check_environment_reports_configured_runtime(tmp_path):
+    """check_environment should report a configured project-local runtime."""
+    from camoufox_reverse_mcp.tools import environment
+
+    exe = tmp_path / "camoufox-bin"
+    exe.write_text("#!/bin/sh\n")
+
+    old_config = dict(environment.browser_manager.default_config)
+    try:
+        environment.browser_manager.default_config = {"executable_path": str(exe)}
+        result = await environment.check_environment()
+    finally:
+        environment.browser_manager.default_config = old_config
+
+    runtime = result["camoufox_reverse"]
+    assert runtime["configured_executable"] == str(exe)
+    assert runtime["configured_executable_exists"] is True
+    assert runtime["installed"] is True
