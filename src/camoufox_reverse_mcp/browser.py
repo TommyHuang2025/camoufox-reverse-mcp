@@ -67,7 +67,9 @@ class BrowserManager:
         self.contexts: dict[str, BrowserContext] = {}
         self.pages: dict[str, Page] = {}
         self.active_page_name: str | None = None
-        self._cm = None  # AsyncCamoufox context manager
+        self._cm = None  # AsyncCamoufox context manager (owned-launch mode)
+        self._pw = None  # async_playwright instance (connect/attach mode)
+        self._connected = False  # True when attached to an external Camoufox server
         self._console_logs: deque[dict] = deque(maxlen=MAX_LOG_SIZE)
         self._network_requests: deque[dict] = deque(maxlen=MAX_LOG_SIZE)
         self._request_id_counter = 0
@@ -100,9 +102,17 @@ class BrowserManager:
                     "capturing": self._capturing,
                 }
 
-        from camoufox.async_api import AsyncCamoufox
-
         cfg = {**self.default_config, **(config or {})}
+
+        # Attach mode: connect to an already-running Camoufox Playwright server
+        # (started via `python -m camoufox server`, which prints a ws:// endpoint)
+        # instead of launching a new browser. Fingerprint spoofing stays intact
+        # because the server itself was launched through Camoufox's launch_options.
+        ws_endpoint = cfg.get("ws_endpoint")
+        if ws_endpoint:
+            return await self._connect(ws_endpoint)
+
+        from camoufox.async_api import AsyncCamoufox
 
         kwargs: dict[str, Any] = {}
 
@@ -224,6 +234,81 @@ class BrowserManager:
             return True
         except Exception:
             return False
+
+    async def _connect(self, ws_endpoint: str) -> dict:
+        """Attach to an already-running Camoufox Playwright server via its ws:// endpoint.
+
+        The server is started externally with `python -m camoufox server`, which prints
+        a `Websocket endpoint: ws://127.0.0.1:<port>/<guid>` line. Pass that full URL here.
+
+        Note: fingerprint config (including os) belongs to the running server. Unlike
+        owned launch(), this path cannot inject the host/os font-fallback shim, so the
+        server should be started with an os fingerprint matching the host for parity.
+        """
+        from playwright.async_api import async_playwright
+
+        async def _teardown():
+            # Disconnect the local client only — never browser.close(), which would
+            # kill the user's external server. Stopping the driver tears down the
+            # client transport while the server keeps running.
+            try:
+                await self._pw.stop()
+            except Exception:
+                pass
+            self._pw = None
+            self.browser = None
+            self._connected = False
+            self.contexts.clear()
+            self.pages.clear()
+            self.active_page_name = None
+
+        self._pw = await async_playwright().start()
+        try:
+            self.browser = await self._pw.firefox.connect(ws_endpoint)
+        except Exception:
+            # Handshake failed — nothing attached yet, just drop the driver.
+            try:
+                await self._pw.stop()
+            finally:
+                self._pw = None
+            raise
+
+        # From here the browser is live; any failure must disconnect cleanly so we
+        # don't leak the driver+connection or wedge the next launch into already_running.
+        try:
+            ctx = self.browser.contexts[0] if self.browser.contexts else await self.browser.new_context()
+            self.contexts["default"] = ctx
+
+            for script_info in self._persistent_scripts:
+                await ctx.add_init_script(script=script_info["content"])
+
+            page = ctx.pages[0] if ctx.pages else await ctx.new_page()
+            self._attach_listeners(page)
+            self.pages["default"] = page
+            self.active_page_name = "default"
+            self._connected = True  # only flip once fully wired
+        except Exception:
+            await _teardown()
+            raise
+
+        result = {
+            "status": "connected",
+            "ws_endpoint": ws_endpoint,
+            "contexts": list(self.contexts.keys()),
+            "pages": list(self.pages.keys()),
+        }
+        # Persistent scripts only run on the NEXT navigation; if we attached to a page
+        # already on a real site, existing hooks aren't live yet — tell the caller.
+        try:
+            current = page.url
+        except Exception:
+            current = ""
+        if current and current != "about:blank":
+            result["warnings"] = [
+                f"attached to a page already at {current}; persistent scripts and hooks "
+                "apply on the next navigation — call reload() to activate them now."
+            ]
+        return result
 
     async def _ensure_browser(self) -> None:
         """Lazy-launch the browser if not already running."""
@@ -369,8 +454,20 @@ class BrowserManager:
         raise RuntimeError("No active page available. Call launch_browser first.")
 
     async def close(self) -> dict:
-        """Close the browser and clean up all resources."""
-        if self._cm is not None:
+        """Close the browser and clean up all resources.
+
+        Owned-launch mode: fully shuts the browser down.
+        Attach mode (connected to an external server): only disconnects the local
+        Playwright client — the user's browser and server are left running.
+        """
+        if self._connected and self._pw is not None:
+            # Disconnect without closing the remote browser: stopping the driver
+            # tears down the client transport but leaves the external server alive.
+            try:
+                await self._pw.stop()
+            except Exception:
+                pass
+        elif self._cm is not None:
             try:
                 await self._cm.__aexit__(None, None, None)
             except Exception:
@@ -380,6 +477,8 @@ class BrowserManager:
         self.pages.clear()
         self.active_page_name = None
         self._cm = None
+        self._pw = None
+        self._connected = False
         self._console_logs.clear()
         self._network_requests.clear()
         self._request_id_counter = 0

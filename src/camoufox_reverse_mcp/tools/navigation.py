@@ -36,8 +36,9 @@ async def launch_browser(
     virtual_display: str | None = None,
     executable_path: str | None = None,
     enable_trace: bool = False,
+    ws_endpoint: str | None = None,
 ) -> dict:
-    """Launch the Camoufox anti-detection browser.
+    """Launch the Camoufox anti-detection browser, or attach to a running one.
 
     Args:
         headless: Run in headless mode (default False).
@@ -56,11 +57,29 @@ async def launch_browser(
         enable_trace: Enable engine-level property access tracing.
             Requires camoufox-reverse custom browser build.
             When enabled, use trace_property_access() to capture DOM access.
+        ws_endpoint: Attach to an already-running Camoufox server instead of
+            launching a new browser. Start the server with
+            `python -m camoufox server`, copy its "Websocket endpoint:
+            ws://127.0.0.1:<port>/<guid>" line, and pass that full URL here.
+            When set, all other launch args (os_type/locale/proxy/...) are
+            ignored — fingerprint config is owned by the running server. Start the
+            server with an os fingerprint matching the host for font-metric parity
+            (attach mode cannot inject the host/os font-fallback shim that launch
+            mode does). close_browser() will only disconnect; the server keeps running.
 
     Returns:
         dict with status, config, and page list.
     """
     try:
+        if ws_endpoint:
+            # Attach mode: only the endpoint matters; the server owns the config.
+            result = await browser_manager.launch({"ws_endpoint": ws_endpoint})
+            if result.get("status") == "already_running":
+                result.setdefault("warnings", []).append(
+                    "A browser is already active. Call close_browser() before attaching."
+                )
+            return result
+
         config = {
             "headless": headless, "os": os_type, "locale": locale,
             "humanize": humanize, "geoip": geoip,
