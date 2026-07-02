@@ -6,6 +6,7 @@ import json as _json
 import os
 
 from ..server import mcp, browser_manager
+from ..proxy import build_proxy_config, redact_proxy_text
 
 _PRE_INJECT_REGISTER_TIMEOUT = 10.0
 
@@ -25,8 +26,11 @@ async def launch_browser(
     os_type: str = "auto",
     locale: str = "auto",
     proxy: str | None = None,
+    proxy_username: str | None = None,
+    proxy_password: str | None = None,
+    proxy_bypass: str | None = None,
     humanize: bool = False,
-    geoip: bool = False,
+    geoip: bool | str = False,
     block_images: bool = False,
     block_webrtc: bool = False,
     virtual_display: str | None = None,
@@ -40,8 +44,11 @@ async def launch_browser(
         os_type: OS fingerprint - "auto", "windows", "macos", or "linux".
         locale: Browser locale (e.g. "zh-CN"). "auto" detects system locale.
         proxy: Proxy server URL (e.g. "http://127.0.0.1:7890").
+        proxy_username: Proxy username for authenticated proxies.
+        proxy_password: Proxy password for authenticated proxies.
+        proxy_bypass: Comma-separated hosts/domains that should bypass proxy.
         humanize: Enable humanized mouse movement.
-        geoip: Auto-infer geolocation from proxy IP.
+        geoip: Auto-infer geolocation from proxy IP, or pass an explicit IP string.
         block_images: Block image loading.
         block_webrtc: Block WebRTC to prevent IP leaks.
         virtual_display: X display for headed browser mode, e.g. ":99".
@@ -64,8 +71,14 @@ async def launch_browser(
             config["virtual_display"] = virtual_display
         if executable_path:
             config["executable_path"] = executable_path
-        if proxy:
-            config["proxy"] = {"server": proxy}
+        proxy_config = build_proxy_config(
+            proxy,
+            username=proxy_username,
+            password=proxy_password,
+            bypass=proxy_bypass,
+        )
+        if proxy_config:
+            config["proxy"] = proxy_config
         result = await browser_manager.launch(config)
 
         if result.get("status") == "already_running":
@@ -87,14 +100,16 @@ async def launch_browser(
 
         return result
     except Exception as e:
+        proxy_config = locals().get("proxy_config")
+        error = redact_proxy_text(e, proxy_config if isinstance(proxy_config, dict) else None)
         if _looks_like_driver_disconnect(e):
             await browser_manager.close()
             return {
-                "error": str(e),
+                "error": error,
                 "browser_recovered": True,
                 "hint": "browser driver disconnected; MCP browser state was cleared, call launch_browser() again",
             }
-        return {"error": str(e)}
+        return {"error": error}
 
 
 @mcp.tool()

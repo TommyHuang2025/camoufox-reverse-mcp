@@ -5,6 +5,7 @@ import importlib
 from typing import Any
 
 from ..server import mcp, browser_manager
+from ..proxy import redact_proxy_config
 
 
 @mcp.tool()
@@ -109,6 +110,7 @@ async def check_environment() -> dict:
         "mcp": {"version": version, "version_ok": version_ok},
         "deps": deps,
         "browser": browser_state,
+        "proxy": redact_proxy_config(browser_manager.default_config.get("proxy")),
         "camoufox_reverse": custom_browser,
         "overall_ok": overall_ok,
         "recommendations": recommendations,

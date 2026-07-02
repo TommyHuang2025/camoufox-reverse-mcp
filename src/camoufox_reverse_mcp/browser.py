@@ -9,6 +9,8 @@ from typing import Any
 
 from playwright.async_api import Page, BrowserContext
 
+from .proxy import redact_proxy_config
+
 MAX_LOG_SIZE = 2000
 MAX_BODY_SIZE = 200_000
 
@@ -41,6 +43,18 @@ def detect_system_locale() -> str:
         if locale:
             return locale
     return "en-US"
+
+
+def validate_browser_proxy_config(proxy: dict[str, Any] | None) -> None:
+    if not proxy:
+        return
+    server = str(proxy.get("server") or "").lower()
+    if server.startswith(("socks4://", "socks5://")) and (proxy.get("username") or proxy.get("password")):
+        raise ValueError(
+            "Camoufox/Firefox does not support authenticated SOCKS proxies. "
+            "Use an authenticated HTTP proxy endpoint, or run a local no-auth SOCKS/HTTP chain proxy "
+            "that authenticates to the upstream provider."
+        )
 
 
 class BrowserManager:
@@ -93,6 +107,7 @@ class BrowserManager:
         kwargs: dict[str, Any] = {}
 
         if cfg.get("proxy"):
+            validate_browser_proxy_config(cfg["proxy"])
             kwargs["proxy"] = cfg["proxy"]
         if cfg.get("executable_path"):
             kwargs["executable_path"] = cfg["executable_path"]
@@ -105,8 +120,9 @@ class BrowserManager:
 
         if cfg.get("humanize"):
             kwargs["humanize"] = True
-        if cfg.get("geoip"):
-            kwargs["geoip"] = True
+        geoip = cfg.get("geoip")
+        if geoip:
+            kwargs["geoip"] = geoip
         if cfg.get("block_images"):
             kwargs["block_images"] = True
         if cfg.get("block_webrtc"):
@@ -190,6 +206,7 @@ class BrowserManager:
             "headless": headless,
             "os": os_type,
             "locale": locale,
+            "proxy": redact_proxy_config(cfg.get("proxy")),
             "virtual_display": cfg.get("virtual_display"),
             "executable_path": cfg.get("executable_path"),
             "pages": list(self.pages.keys()),
