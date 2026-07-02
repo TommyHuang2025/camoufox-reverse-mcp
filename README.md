@@ -99,6 +99,68 @@ pip install -e .
 }
 ```
 
+需要认证的代理推荐把账号密码放在独立参数中，不要拼进 URL：
+
+```json
+{
+  "mcpServers": {
+    "camoufox-reverse": {
+      "command": "python",
+      "args": [
+        "-m", "camoufox_reverse_mcp",
+        "--proxy", "socks5://proxy.example.com:1080",
+        "--proxy-username", "${PROXY_USERNAME}",
+        "--proxy-password", "${PROXY_PASSWORD}",
+        "--geoip",
+        "--block-webrtc"
+      ]
+    }
+  }
+}
+```
+
+如果你已经通过 provider 自己的 IP echo 拿到了出口 IP，可以避免 `geoip=true` 再访问公共 IP API：
+
+```json
+{
+  "mcpServers": {
+    "camoufox-reverse": {
+      "command": "python",
+      "args": [
+        "-m", "camoufox_reverse_mcp",
+        "--proxy", "http://proxy.example.com:8080",
+        "--proxy-username", "${PROXY_USERNAME}",
+        "--proxy-password", "${PROXY_PASSWORD}",
+        "--geoip-ip", "203.0.113.10"
+      ]
+    }
+  }
+}
+```
+
+也可以在单次工具调用中传入：
+
+```text
+launch_browser(
+  proxy="socks5://proxy.example.com:1080",
+  proxy_username="user",
+  proxy_password="pass",
+  proxy_bypass=".internal,localhost",
+  geoip=true
+)
+```
+
+代理支持情况：
+
+| 代理形态 | MCP 配置 | 状态 |
+|---|---|---|
+| HTTP 代理 | `--proxy http://host:port` | 支持 |
+| HTTPS 代理 | `--proxy https://host:port` | 支持 |
+| SOCKS4 代理 | `--proxy socks4://host:port` | 传递给 Playwright/Firefox；实际可用性取决于浏览器运行时 |
+| SOCKS5 代理 | `--proxy socks5://host:port` | 支持无认证 SOCKS5；Firefox 不支持带用户名/密码的 SOCKS5 |
+
+ASocks、Decodo、Proxy-Seller、IPRoyal 这类 provider 只要提供标准 HTTP(S) 或无认证 SOCKS5 endpoint，就用同一套 `server + username + password` 参数接入；provider 的国家、ASN、sticky session 等选择通常写在 provider 的用户名、密码或端口配置里。`socks5h://` / `socks4a://` 属于 curl/协议脚本常见写法，MCP 会在传给浏览器前分别规范化为 `socks5://` / `socks4://`。如果 provider 只给带认证的 SOCKS5，请先运行本地无认证链式代理，让浏览器连接 `socks5://127.0.0.1:<port>`。
+
 </details>
 
 <details>

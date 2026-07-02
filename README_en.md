@@ -99,6 +99,77 @@ pip install -e .
 }
 ```
 
+For authenticated proxies, prefer separate username/password arguments instead
+of embedding credentials in the URL:
+
+```json
+{
+  "mcpServers": {
+    "camoufox-reverse": {
+      "command": "python",
+      "args": [
+        "-m", "camoufox_reverse_mcp",
+        "--proxy", "socks5://proxy.example.com:1080",
+        "--proxy-username", "${PROXY_USERNAME}",
+        "--proxy-password", "${PROXY_PASSWORD}",
+        "--geoip",
+        "--block-webrtc"
+      ]
+    }
+  }
+}
+```
+
+If you already obtained the proxy exit IP from a provider-specific IP echo,
+avoid the extra public-IP lookup by passing it explicitly:
+
+```json
+{
+  "mcpServers": {
+    "camoufox-reverse": {
+      "command": "python",
+      "args": [
+        "-m", "camoufox_reverse_mcp",
+        "--proxy", "http://proxy.example.com:8080",
+        "--proxy-username", "${PROXY_USERNAME}",
+        "--proxy-password", "${PROXY_PASSWORD}",
+        "--geoip-ip", "203.0.113.10"
+      ]
+    }
+  }
+}
+```
+
+You can also pass proxy auth for a single tool call:
+
+```text
+launch_browser(
+  proxy="socks5://proxy.example.com:1080",
+  proxy_username="user",
+  proxy_password="pass",
+  proxy_bypass=".internal,localhost",
+  geoip=true
+)
+```
+
+Proxy support:
+
+| Proxy type | MCP config | Status |
+|---|---|---|
+| HTTP proxy | `--proxy http://host:port` | Supported |
+| HTTPS proxy | `--proxy https://host:port` | Supported |
+| SOCKS4 proxy | `--proxy socks4://host:port` | Forwarded to Playwright/Firefox; actual usability depends on the browser runtime |
+| SOCKS5 proxy | `--proxy socks5://host:port` | Unauthenticated SOCKS5 is supported; Firefox does not support username/password auth for SOCKS5 |
+
+Providers such as ASocks, Decodo, Proxy-Seller, and IPRoyal are supported when
+they expose a normal HTTP(S) or unauthenticated SOCKS5 endpoint. Use the same
+`server + username + password` fields; provider-specific country, ASN, and
+sticky-session choices usually live in the provider username, password, or port.
+`socks5h://` / `socks4a://` are common in curl/protocol scripts; MCP normalizes
+them to `socks5://` / `socks4://` before passing the proxy to the browser.
+If a provider only exports authenticated SOCKS5, run a local no-auth chain proxy
+and point the browser at `socks5://127.0.0.1:<port>`.
+
 </details>
 
 <details>
